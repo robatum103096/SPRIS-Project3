@@ -52,7 +52,9 @@ ggplot(data_expanded,aes(x=age,y=mem_comp))+
 ```
 
 ```{r}
-#completers analysis
+#COMPLETERS ANALYSIS
+
+#extract complete data
 subj.w.na=unique(data_expanded$subject_id[which(is.na(data_expanded$mem_comp))])
 
 complete.data=data_expanded%>%
@@ -61,12 +63,17 @@ complete.data=data_expanded%>%
          age=as.numeric(age),
          treatment_group=factor(treatment_group,levels=c("Placebo","Low Dose","High Dose")))
 
-#linear mixed model
+#vis trend over days by trt
+ggplot(complete.data,aes(x=day,y=mem_comp,group=subject_id))+
+  geom_line()+facet_wrap(~treatment_group)
+
+#linear mixed model w random int... and slope?
 
 lmm1=nlme::lme(mem_comp~age+gender+treatment_group+day,
                random=~1|subject_id,
                data=complete.data)
 summary(lmm1)
+
 #assumptions met?
 plot(lmm1)
 ```
