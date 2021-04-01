@@ -157,7 +157,8 @@ model_pmm_v2 %>%
   tbl_regression() %>% 
   add_global_p()
 
-summary(pool(model_pmm))
+# doesn't work
+# summary(pool(model_pmm))
 ```
 
 Spaghetti plot with imputed data
