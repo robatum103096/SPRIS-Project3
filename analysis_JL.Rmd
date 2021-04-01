@@ -12,7 +12,11 @@ knitr::opts_chunk$set(echo = FALSE)
 
 library(tidyverse)
 library(gtsummary)
+library(lme4)
 library(mice)
+
+# vignette for mice package for longitudinal data
+# https://www.gerkovink.com/miceVignettes/Multi_level/Multi_level_data.html
 
 load(here::here("datasets.rdata"))
 
@@ -30,6 +34,8 @@ data_expanded %>%
 ```
 
 # Spaghetti plot for patient trajectories over time
+
+Does not seem that a random slope is necessary?
 
 ```{r}
 data_expanded %>% 
@@ -56,4 +62,122 @@ data_expanded %>%
 data_expanded %>% 
   tbl_summary(by = treatment_group,
               include = c(treatment_group, mem_comp))
+```
+
+
+# Distribution of missing data
+
+This figure doesn't help a ton to identify patterns since only 1 var is missing data
+
+```{r}
+visdat::vis_miss(data_expanded)
+```
+
+From Mice package, but weird output? 
+
+```{r}
+md.pattern(data_expanded)
+```
+
+Does the distribution of missing data depend on the covariates?
+
+Data more likely to be missing at later time points
+
+Otherwise no significant differences in the distribution of missingness by treatment group, age or gender
+
+```{r}
+data_expanded %>% 
+  mutate(missing_mem_comp = case_when(
+    is.na(mem_comp) ~ 1,
+    TRUE ~ 0
+  )) %>% 
+  select(-subject_id, -mem_comp) %>% 
+  tbl_summary(by = missing_mem_comp) %>% 
+  add_p()
+```
+
+Distribution of the mem_comp variable
+
+Sort of skewed, but not too badly
+
+```{r}
+ggplot(data_expanded, aes(x = mem_comp)) + 
+  geom_histogram()
+```
+
+
+# Impute data
+
+Assume that the data are missing at random, conditional on the data available (age, gender, days)
+
+Take clustering into account during imputation
+
+```{r}
+# predictive mean matching
+# semi-parametric imputation approach
+# https://stats.idre.ucla.edu/r/faq/how-do-i-perform-multiple-imputation-using-predictive-mean-matching-in-r/
+# for each missing value, it fills in a value randomly from among the a observed donor values from an observation whose regression-predicted values are closest to the regression-predicted value for the missing value from the simulated regression model (Heitjan and Little 1991; Schenker and Taylor 1996)
+imputed_df_pmm <- mice(data_expanded, method = "pmm", m = 5, seed = 1123)
+
+# imputation method used for each variable
+# only mem_comp is imputed
+imputed_df_pmm$method
+summary(imputed_df_pmm)
+
+# predictor matrix
+imputed_df_pmm$predictorMatrix
+
+# default plots output
+plot(imputed_df_pmm)
+
+# here is the imputed data
+imputed_df_pmm$imp$mem_comp
+
+# get back the dataset with imputed data
+data_pmm <- complete(imputed_df_pmm)
+
+# only 188
+nrow(data_pmm)
+
+# fit model on imputed data
+model_pmm <- with(data_pmm, lmer(mem_comp ~ treatment_group + day + treatment_group*day + age + gender + (1 | subject_id), data = data_pmm))
+
+# table of model results on imputed data
+# interaction between tx * day is not significant -> remove and re-run
+model_pmm %>% 
+  tbl_regression() %>% 
+  add_global_p()
+
+# w/o interaction term
+model_pmm_v2 <- with(data_pmm, lmer(mem_comp ~ treatment_group + day + age + gender + (1 | subject_id), data = data_pmm)) 
+
+# table of results
+# nothing statistically significant
+model_pmm_v2 %>% 
+  tbl_regression() %>% 
+  add_global_p()
+
+# doesn't work
+# summary(pool(model_pmm))
+```
+
+Spaghetti plot with imputed data
+
+```{r}
+data_pmm %>% 
+  mutate(measurement_time = case_when(
+    day == 0 ~ 1,
+    day == 5 ~ 2,
+    day == 19 ~ 3,
+    day == 90 ~ 4
+  )) %>% 
+  ggplot(aes(x = day, y = mem_comp)) +
+  geom_point(aes(color = treatment_group, group = subject_id)) +
+  geom_line(aes(color = treatment_group, group = subject_id)) +
+  geom_smooth(color = "gray", size = 2, method = "loess", se = FALSE) +
+  labs(x = "Day",
+       color = "Treatment",
+       y = "Cognitive Rating",
+       caption = "Higher cognitive rating indicates better memory.") +
+  facet_grid(.~treatment_group)
 ```
