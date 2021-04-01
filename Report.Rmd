@@ -74,7 +74,7 @@ lmm1=nlme::lme(mem_comp~age+gender+treatment_group+day,
                data=complete.data)
 summary(lmm1)
 
-#assumptions met?
+#assumptions met? 
 plot(lmm1)
 ```
 
