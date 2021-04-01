@@ -1,0 +1,44 @@
+---
+title: "SPRIS Project 3"
+author: "Jessica Lavery"
+date: "3/31/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(tidyverse)
+library(gtsummary)
+
+load(here::here("datasets.rdata"))
+
+theme_set(theme_bw() + theme(legend.position = "bottom"))
+```
+
+# Table 1
+
+```{r}
+data_expanded %>% 
+  distinct(subject_id, treatment_group, age, gender) %>% 
+  select(-subject_id) %>% 
+  tbl_summary(by = treatment_group) %>% 
+  add_overall()
+```
+
+# Spaghetti plot for patient trajectories over time
+
+```{r}
+data_expanded_tidy %>% 
+  ggplot(aes(x = day_factor, y = mem_comp, color = treatment_group, group = subject_id)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Day",
+       color = "Treatment",
+       y = "Cognitive Rating",
+       caption = "Higher cognitive rating indicates better memory.") +
+  facet_grid(.~treatment_group)
+```
+
