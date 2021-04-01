@@ -53,7 +53,11 @@ nrow(expand_df) == length(unique(raw_data$subject_id))*4
 data_expanded <- left_join(expand_df,
                            raw_data,
                            by = c("subject_id", "day", "age", "gender",
-                                  "treatment_group"))
+                                  "treatment_group")) %>% 
+  mutate(tx = factor(case_when(treatment_group == "A" ~ "Placebo",
+                        treatment_group == "B" ~ "High dose",
+                        treatment_group == "C" ~ "Low dose"), levels = c("Placebo", "Low dose", "High dose")))
+
 # look at new dataset
 head(raw_data)
 head(data_expanded, 40)
