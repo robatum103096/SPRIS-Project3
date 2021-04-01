@@ -22,16 +22,62 @@ output: pdf_document
 ```{r}
 #load libaries
 library(tidyverse)
-
-#load data
-dt=read.csv("data.csv")
+library(naniar)
 
 #tidy data
-dt=dt%>%
-  mutate(trt=ifelse(Treatment_Group=="A","Placebo",
-                    ifelse(Treatment_Group=="B","Low Dose","High Dose")),
-         Gender=ifelse(Gender=="M","Male","Female"))
+data_expanded=data_expanded%>%
+  mutate(treatment_group=ifelse(treatment_group=="A","Placebo",
+                    ifelse(treatment_group=="B","Low Dose","High Dose")),
+         gender=ifelse(gender=="M","Male","Female"))
+
+#assess total missingness
+total.missing=length(which(is.na(data_expanded)))
+total.missing #30 missing entries for composite mem score
+
+#missingness by day
+missing.by.day=data_expanded%>%
+  group_by(day)%>%
+  summarise(Missing=length(which(is.na(mem_comp))))
+missing.by.day 
+#everyone has a bl measure, 2 missing at 5 days, 12 missing at 19 days, 16 missing at 90 days
+
+#visualizing missing data
+vis_miss(data_expanded)
+
+gg_miss_var(data_expanded, show_pct = TRUE)
+
+ggplot(data_expanded,aes(x=age,y=mem_comp))+
+  geom_miss_point()+
+  facet_wrap(~day)
 ```
+
+```{r}
+#completers analysis
+subj.w.na=unique(data_expanded$subject_id[which(is.na(data_expanded$mem_comp))])
+
+complete.data=data_expanded%>%
+  dplyr::filter(!subject_id %in% subj.w.na) %>%
+  mutate(day=factor(day),
+         age=as.numeric(age),
+         treatment_group=factor(treatment_group,levels=c("Placebo","Low Dose","High Dose")))
+
+#linear mixed model
+
+lmm1=nlme::lme(mem_comp~age+gender+treatment_group+day,
+               random=~1|subject_id,
+               data=complete.data)
+summary(lmm1)
+#assumptions met?
+plot(lmm1)
+```
+
+
+
+
+
+
+
+
 
 
 
