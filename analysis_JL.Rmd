@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 library(tidyverse)
 library(gtsummary)
+library(mice)
 
 load(here::here("datasets.rdata"))
 
@@ -31,10 +32,17 @@ data_expanded %>%
 # Spaghetti plot for patient trajectories over time
 
 ```{r}
-data_expanded_tidy %>% 
-  ggplot(aes(x = day_factor, y = mem_comp, color = treatment_group, group = subject_id)) +
-  geom_point() +
-  geom_line() +
+data_expanded %>% 
+  mutate(measurement_time = case_when(
+    day == 0 ~ 1,
+    day == 5 ~ 2,
+    day == 19 ~ 3,
+    day == 90 ~ 4
+  )) %>% 
+  ggplot(aes(x = day, y = mem_comp)) +
+  geom_point(aes(color = treatment_group, group = subject_id)) +
+  geom_line(aes(color = treatment_group, group = subject_id)) +
+  geom_smooth(color = "gray", size = 2, method = "loess", se = FALSE) +
   labs(x = "Day",
        color = "Treatment",
        y = "Cognitive Rating",
@@ -42,3 +50,10 @@ data_expanded_tidy %>%
   facet_grid(.~treatment_group)
 ```
 
+# Numeric summary of average cognitive scores over time, by treatment
+
+```{r}
+data_expanded %>% 
+  tbl_summary(by = treatment_group,
+              include = c(treatment_group, mem_comp))
+```
