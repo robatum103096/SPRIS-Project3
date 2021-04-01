@@ -24,6 +24,8 @@ output: pdf_document
 library(tidyverse)
 library(naniar)
 
+load(here::here("datasets.rdata"))
+
 #tidy data
 data_expanded=data_expanded%>%
   mutate(treatment_group=ifelse(treatment_group=="A","Placebo",
