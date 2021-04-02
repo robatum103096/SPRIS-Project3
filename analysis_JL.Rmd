@@ -71,14 +71,15 @@ data_expanded %>%
     day == 90 ~ 4
   )) %>% 
   ggplot(aes(x = day, y = mem_comp)) +
-  geom_point(aes(color = treatment_group, group = subject_id)) +
-  geom_line(aes(color = treatment_group, group = subject_id)) +
+  geom_point(aes(color = tx, group = subject_id)) +
+  geom_line(aes(color = tx, group = subject_id)) +
   geom_smooth(color = "gray", size = 2, method = "loess", se = FALSE) +
   labs(x = "Day",
        color = "Treatment",
        y = "Cognitive Rating",
        caption = "Higher cognitive rating indicates better memory.") +
-  facet_grid(.~treatment_group)
+  facet_grid(.~tx) +
+  theme(legend.position = "none")
 ```
 
 # Numeric summary of average cognitive scores over time, by treatment
@@ -116,9 +117,15 @@ data_expanded %>%
     is.na(mem_comp) ~ 1,
     TRUE ~ 0
   )) %>% 
-  select(-subject_id, -mem_comp) %>% 
-  tbl_summary(by = missing_mem_comp) %>% 
-  add_p()
+  select(tx, age, gender, day) %>% 
+  tbl_summary(by = missing_mem_comp,
+              label = list(age = "Age (years)",
+                           gender = "Gender",
+                           tx = "Treatment group",
+                           day = "Assessment day")) %>% 
+  add_p() %>% 
+  bold_labels() %>% 
+  italicize_levels()
 ```
 
 Distribution of the mem_comp variable
@@ -142,7 +149,7 @@ Take clustering into account during imputation
 # semi-parametric imputation approach
 # https://stats.idre.ucla.edu/r/faq/how-do-i-perform-multiple-imputation-using-predictive-mean-matching-in-r/
 # for each missing value, it fills in a value randomly from among the a observed donor values from an observation whose regression-predicted values are closest to the regression-predicted value for the missing value from the simulated regression model (Heitjan and Little 1991; Schenker and Taylor 1996)
-imputed_df_pmm <- mice(data_expanded, method = "pmm", m = 5, seed = 1123)
+imputed_df_pmm <- mice(data_expanded %>% select(-treatment_group), method = "pmm", m = 5, seed = 1123)
 
 # imputation method used for each variable
 # only mem_comp is imputed
@@ -165,7 +172,7 @@ data_pmm <- complete(imputed_df_pmm)
 nrow(data_pmm)
 
 # fit model on imputed data
-model_pmm <- with(data_pmm, lmer(mem_comp ~ treatment_group + day + treatment_group*day + age + gender + (1 | subject_id), data = data_pmm))
+model_pmm <- with(data_pmm, lmer(mem_comp ~ tx + day + tx*day + age + gender + (1 | subject_id), data = data_pmm))
 
 # table of model results on imputed data
 # interaction between tx * day is not significant -> remove and re-run
@@ -174,13 +181,18 @@ model_pmm %>%
   add_global_p()
 
 # w/o interaction term
-model_pmm_v2 <- with(data_pmm, lmer(mem_comp ~ treatment_group + day + age + gender + (1 | subject_id), data = data_pmm)) 
+model_pmm_v2 <- with(data_pmm, lmer(mem_comp ~ tx + day + age + gender + (1 | subject_id), data = data_pmm)) 
 
 # table of results
 # nothing statistically significant
 model_pmm_v2 %>% 
-  tbl_regression() %>% 
-  add_global_p()
+  tbl_regression(label = list(tx = "Treatment group",
+                              day = "Assessment day",
+                              age = "Age (years)",
+                              gender = "Gender")) %>% 
+  add_global_p() %>% 
+  bold_labels() %>% 
+  italicize_levels()
 
 # doesn't work
 # summary(pool(model_pmm))
