@@ -61,12 +61,11 @@ subj.w.na=unique(data_expanded$subject_id[which(is.na(data_expanded$mem_comp))])
 
 complete.data=data_expanded%>%
   dplyr::filter(!subject_id %in% subj.w.na) %>%
-  mutate(day=factor(day),
-         age=as.numeric(age),
+  mutate(age=as.numeric(age),
          treatment_group=factor(treatment_group,levels=c("Placebo","Low Dose","High Dose")))
 
 #vis trend over days by trt
-ggplot(complete.data,aes(x=day,y=mem_comp,group=subject_id))+
+ggplot(complete.data,aes(x=day,y=mem_comp,group=subject_id,color=gender))+
   geom_line()+facet_wrap(~treatment_group)
 
 #linear mixed model w random int... and slope?
