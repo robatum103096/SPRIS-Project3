@@ -55,8 +55,8 @@ data_expanded <- left_join(expand_df,
                            by = c("subject_id", "day", "age", "gender",
                                   "treatment_group")) %>% 
   mutate(tx = factor(case_when(treatment_group == "A" ~ "Placebo",
-                        treatment_group == "B" ~ "High dose",
-                        treatment_group == "C" ~ "Low dose"), levels = c("Placebo", "Low dose", "High dose")))
+                        treatment_group == "B" ~ "Low dose",
+                        treatment_group == "C" ~ "High dose"), levels = c("Placebo", "Low dose", "High dose")))
 
 # look at new dataset
 head(raw_data)
