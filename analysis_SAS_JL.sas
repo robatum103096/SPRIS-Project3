@@ -1,46 +1,95 @@
 * read in data;
-/*PROC IMPORT OUT= WORK.df_imputed*/
-/*            DATAFILE= "C:\Users\laveryj\Desktop\SPRIS-Project3\data_pmm.csv" */
-/*            DBMS=CSV REPLACE;*/
-/*     GETNAMES=YES;*/
-/*     DATAROW=2; */
-/*RUN;*/
+PROC IMPORT OUT= WORK.df_with_missing
+            DATAFILE= "C:\Users\laveryj\Desktop\SPRIS-Project3\df_for_model.csv" 
+            DBMS=CSV REPLACE;
+     GETNAMES=YES;
+     DATAROW=2; 
+RUN;
 
-* run hierarchical model;
-/*proc glimmix data = df_imputed method = RMPL;*/
-/*	class subject_id gender (ref = "F") tx (ref = "Placebo");*/
-/*	model mem_comp = tx day age gender / s;*/
-/*	random intercept / subject = subject_id;*/
-/*run;*/
+proc contents data = df_with_missing; run;
+
+* make variable numeric;
+data df_with_missing1;
+	set df_with_missing (rename=(mem_comp = mem_comp_c));
+
+	* make numeric;
+	mem_comp = input(mem_comp_c, 8.3);
+run;
+
+* identify completers;
+proc sql;
+	create table df_with_missing2 as
+	select *, count(*) as n_recs
+	from df_with_missing1
+	where not missing(mem_comp)
+	group by subject_id;
+quit;
+
+* test for interaction term: not significant, remove;
+proc mixed data = df_with_missing2 method = REML;
+	class subject_id gender (ref = "F") tx (ref = "Placebo");
+	* completers only;
+	where n_recs = 3;
+	model mem_comp = bl_mem_comp tx day tx*day age gender / s cl;
+	random intercept / subject = subject_id;
+run;
 
 * run hierarchical model to get difference in means;
 * test for different effect of tx over time;
-proc mixed data = df_imputed method = REML;
+* without tx*day interaction, test for lsmeans diff of tx by day is all the same for each day, which makes sense
+b/c the effect of tx wasnt set to change by day; 
+proc mixed data = df_with_missing2 method = REML;
+	* completers only;
+	where n_recs = 3;
 	class subject_id gender (ref = "F") tx (ref = "Placebo");
-	model mem_comp = tx day tx*day age gender / s cl;
+	model mem_comp = bl_mem_comp tx day tx*day age gender / s cl;
 	random intercept / subject = subject_id;
 	ods trace on;
-	ods output Diffs=diffs solutionf = est;
-	lsmeans tx  / at day = 5 diff cl;
-	lsmeans tx / at day = 19 diff cl;
-	lsmeans tx / at day = 90 diff cl;
+	ods output Diffs=diffs_missing solutionf = est;
+	lsmeans tx / diff cl adjust = tukey;
+	lsmeans tx  / at day = 5 diff cl adjust = tukey;
+	lsmeans tx / at day = 19 diff cl adjust = tukey;
+	lsmeans tx / at day = 90 diff cl adjust = tukey;
+run;
+
+* export to R to export to Latex table;
+PROC EXPORT DATA= WORK.Diffs_missing
+            OUTFILE= "diffs_missing_data_model.csv" 
+            DBMS=CSV REPLACE;
+     PUTNAMES=YES;
+RUN;
+
+** on imputed data;
+PROC IMPORT OUT= WORK.df_imputed
+            DATAFILE= "C:\Users\laveryj\Desktop\SPRIS-Project3\df_imputed.csv" 
+            DBMS=CSV REPLACE;
+     GETNAMES=YES;
+     DATAROW=2; 
+RUN;
+
+* test interaction term;
+proc mixed data = df_imputed method = REML;
+	class subject_id gender (ref = "F") tx (ref = "Placebo");
+	model mem_comp = bl_mem_comp tx day tx*day age gender / s cl;
+	random intercept / subject = subject_id;
 run;
 
 * run hierarchical model to get difference in means;
 proc mixed data = df_imputed method = REML;
 	class subject_id gender (ref = "F") tx (ref = "Placebo");
-	model mem_comp = tx day age gender / s cl;
+	model mem_comp = bl_mem_comp tx day tx*day age gender / s cl;
 	random intercept / subject = subject_id;
 	ods trace on;
-	ods output Diffs=diffs solutionf = est;
-	lsmeans tx  / at day = 5 diff cl;
-	lsmeans tx / at day = 19 diff cl;
-	lsmeans tx / at day = 90 diff cl;
+	ods output Diffs=diffs_imputed lsmeans=lsmeans_imputed solutionf = est;
+	lsmeans tx / diff cl adjust = tukey;
+	lsmeans tx  / at day = 5 diff cl adjust = tukey;
+	lsmeans tx / at day = 19 diff cl adjust = tukey;
+	lsmeans tx / at day = 90 diff cl adjust = tukey;
 run;
 
 * export to R to export to Latex table;
-PROC EXPORT DATA= WORK.EST 
-            OUTFILE= "imputed_model_results.csv" 
+PROC EXPORT DATA= WORK.diffs_imputed 
+            OUTFILE= "diffs_imputed_model.csv" 
             DBMS=CSV REPLACE;
      PUTNAMES=YES;
 RUN;
